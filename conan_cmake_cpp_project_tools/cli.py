@@ -2,6 +2,7 @@ import typer
 import pathlib
 import tempfile
 import fnmatch
+import yaml
 from rich import print
 import conan_cmake_cpp_project_tools.config as config
 import conan_cmake_cpp_project_tools.utils as utils
@@ -11,6 +12,7 @@ import conan_cmake_cpp_project_tools.steps as steps
 APP_NAME="ccc"
 app = typer.Typer(name=APP_NAME)
 cfg = config.fspathtree()
+progress = config.fspathtree()
 
 
 @app.callback()
@@ -32,7 +34,7 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
     root_dir = utils.find_project_root(pathlib.Path())
     if root_dir is None:
         print(f"[red]Could not determine root project directory for '{pathlib.Path()}'[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(code=1)
     config.load_config_files(cfg,utils.find_project_root(pathlib.Path()).absolute(),"ccc")
 
     cfg['/build_type'] = build_type
@@ -51,7 +53,28 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
 
     if write_scripts:
         cfg['directories/scripts'] = cfg['directories/build']
-        
+
+    if cfg.get('/files/progress',None) is None:
+        cfg['/files/progress'] = cfg['directories/build'] / 'ccc-progress.yml'
+
+    if not cfg['/files/progress'].exists():
+        cfg['/files/progress'].parent.mkdir(parents=True,exist_ok=True)
+        cfg['/files/progress'].write_text('{}')
+
+    progress.tree.update( yaml.safe_load( cfg['/files/progress'].read_text() ) )
+
+
+    
+def run_step_if_pending(name,error_msg,force_run=False):
+    if force_run == False and progress.get(f'/steps/{name}', "incomplete") == "complete":
+        print(f'"{name}" has step already completed. Skipping.')
+        return 0
+    if getattr(steps,name)(cfg) != 0:
+        print(f"{error_msg}")
+        progress[f'/steps/{name}'] = "error"
+    else:
+        progress[f'/steps/{name}'] = "complete"
+    
 
 @app.command()
 def install_deps():
@@ -60,11 +83,12 @@ def install_deps():
     '''
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        if not cfg.get('directories/scripts',False):
-            cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
+        if not cfg.get('/directories/scripts',False):
+            cfg['/directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if steps.install_deps(cfg) != 0:
-                print("[red]There was an error installing dependencies.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies.[/red]")
+
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 
 @app.command()
@@ -77,10 +101,10 @@ def configure():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if steps.install_deps(cfg) != 0:
-                print("[red]There was an error installing dependencies. Halting.[/red]")
-            if steps.configure_build(cfg) != 0:
-                print("[red]There was an error configuring build.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
+            run_step_if_pending('configure_build',"[red]There was an error configuring build.[/red]")
+
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 @app.command()
 def build():
@@ -92,12 +116,10 @@ def build():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if steps.install_deps(cfg) != 0:
-                print("[red]There was an error installing dependencies. Halting.[/red]")
-            if steps.configure_build(cfg) != 0:
-                print("[red]There was an error configuring build. Halting.[/red]")
-            if steps.run_build(cfg) != 0:
-                print("[red]There was an error running build.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]")
+            run_step_if_pending('run_build',"[red]There was an error running build.[/red]",force_run=True)
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 
 # we are not naming this function `test` because pytest will pick it up as a test to run, which it is not.
@@ -111,14 +133,35 @@ def run_test():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if steps.install_deps(cfg) != 0:
-                print("[red]There was an error installing dependencies. Halting.[/red]")
-            if steps.configure_build(cfg) != 0:
-                print("[red]There was an error configuring build. Halting.[/red]")
-            if steps.run_build(cfg) != 0:
-                print("[red]There was an error running build. Halting[/red]")
-            if steps.run_tests(cfg) != 0:
-                print("[red]There was an error running the tests.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]")
+            run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=True)
+            run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=True)
+
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
+
+
+@app.command()
+def install(install_dir:pathlib.Path):
+    '''
+    Install project into a directory.
+    '''
+
+    cfg['cmake/install/extra_args'] = ['--prefix',str(install_dir)]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        if not cfg.get('directories/scripts',False):
+            cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
+        with utils.working_directory(tmpdir):
+            # if steps.install_deps(cfg) != 0:
+            #     print("[red]There was an error installing dependencies. Halting.[/red]")
+            # if steps.configure_build(cfg) != 0:
+            #     print("[red]There was an error configuring build. Halting.[/red]")
+            # if steps.run_build(cfg) != 0:
+            #     print("[red]There was an error running build. Halting[/red]")
+            if steps.install(cfg) != 0:
+                print("[red]There was an error installing.[/red]")
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 @app.command()
 def list_sources():

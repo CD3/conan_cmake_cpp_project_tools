@@ -41,6 +41,7 @@ def set_defaults( cfg: fspathtree, overwrite:bool = True):
         cfg['/shell'] = get_shell()
 
 
+
 def set_default_build_dir(cfg:fspathtree):
     cfg['directories/build'] = cfg.get('directories/root',pathlib.Path())/make_build_dir_name(build_type=cfg.get('/build_type','unknown'),system=cfg.get('/system','unknown') )
 

@@ -159,3 +159,37 @@ def run_tests(config:fspathtree,run=True):
             return result.returncode
 
 
+def install(config:fspathtree,run=True):
+    '''
+    Install project into given directory.
+    '''
+
+    if config.get('directories/build',None) is None:
+        raise RuntimeError("No build directory given. Cannot run configure_build step.")
+
+    bdir = config['directories/build'].absolute()
+
+    if not bdir.exists():
+        raise RuntimeError(f"The build directory '{bdir}' has not been created yet.")
+
+    script = Script( system=config.get('/system',get_system()), shell=config.get('/shell', get_shell()) )
+    script_filename = config.get('run_build/script_filename','05-install')
+
+    with working_directory(config['directories/scripts']):
+        script.cd(bdir.parent)
+        script.cd(relpath(bdir,bdir.parent))
+
+        cmake_cmd = [ config.get('cmake/cmd','cmake') ]
+        default_args = ["--install",'.']
+        cmake_cmd += [ arg for arg in config.get('cmake/install/args',fspathtree(default_args)).tree ]
+        cmake_cmd += [ arg for arg in config.get('cmake/install/extra_args',fspathtree([])).tree ]
+
+        script.add_command( cmake_cmd )
+
+
+        script.write(pathlib.Path(script_filename),exit_on_error=True)
+        
+        if run:
+            cmd = cmd_to_run_shell_script(script_filename)
+            result = subprocess.run(cmd)
+            return result.returncode
