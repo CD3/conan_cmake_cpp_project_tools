@@ -77,7 +77,7 @@ def run_step_if_pending(name,error_msg,force_run=False):
     
 
 @app.command()
-def install_deps():
+def install_deps(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
     Install project dependencies into build directory with Conan.
     '''
@@ -86,13 +86,13 @@ def install_deps():
         if not cfg.get('/directories/scripts',False):
             cfg['/directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            run_step_if_pending('install_deps',"[red]There was an error installing dependencies.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies.[/red]",force_run=force)
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 
 @app.command()
-def configure():
+def configure(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
     Configure project build.
     '''
@@ -101,13 +101,13 @@ def configure():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
-            run_step_if_pending('configure_build',"[red]There was an error configuring build.[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force)
+            run_step_if_pending('configure_build',"[red]There was an error configuring build.[/red]",force_run=force)
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 @app.command()
-def build():
+def build(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
     Build project build.
     '''
@@ -116,15 +116,15 @@ def build():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
-            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force)
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force)
             run_step_if_pending('run_build',"[red]There was an error running build.[/red]",force_run=True)
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 
 # we are not naming this function `test` because pytest will pick it up as a test to run, which it is not.
 @app.command(name="test")
-def run_test():
+def run_test(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
     Run project unit tests.
     '''
@@ -133,8 +133,8 @@ def run_test():
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]")
-            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force)
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force)
             run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=True)
             run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=True)
 
@@ -142,7 +142,7 @@ def run_test():
 
 
 @app.command()
-def install(install_dir:pathlib.Path):
+def install(install_dir:pathlib.Path,force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
     Install project into a directory.
     '''
@@ -153,12 +153,10 @@ def install(install_dir:pathlib.Path):
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            # if steps.install_deps(cfg) != 0:
-            #     print("[red]There was an error installing dependencies. Halting.[/red]")
-            # if steps.configure_build(cfg) != 0:
-            #     print("[red]There was an error configuring build. Halting.[/red]")
-            # if steps.run_build(cfg) != 0:
-            #     print("[red]There was an error running build. Halting[/red]")
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force)
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force)
+            run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=force)
+            run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=force)
             if steps.install(cfg) != 0:
                 print("[red]There was an error installing.[/red]")
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
