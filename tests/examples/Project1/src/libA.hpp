@@ -1,0 +1,5 @@
+
+
+namespace libA {
+  void print();
+}
