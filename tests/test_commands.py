@@ -39,9 +39,13 @@ target_link_libraries(main-tests Boost::boost)
         (tmpdir / "Project1/src/main.cpp").write_text('''
 #include <iostream>
 #include <boost/units/quantity.hpp>
-int main()
+int main(int argc, char* argv[])
 {
     std::cout << "works";
+    for(int i = 1; i < argc; ++i)
+    {
+        std::cout << " " << argv[i];
+    }
     return 0;
 }
         ''')
@@ -170,4 +174,36 @@ echo "activating virtual environment"
         assert script_lines[2] == "cd build-test"
         assert script_lines[3] == "./main-tests"
 
+        cmd = utils.cmd_to_run_shell_script(tmpdir/"Project1/04-run_tests")
+        res = subprocess.run(cmd,capture_output=True)
+        assert res.returncode == 0
+        assert res.stdout.decode('utf-8') == "works"
+
+        assert utils.is_exe( tmpdir/"Project1/build-test/main-tests")
+        assert utils.is_debug_exe( tmpdir/"Project1/build-test/main-tests")
+        files = list(utils.find_unit_test_binaries(tmpdir))
+        assert len(files) == 1
+        files[0].name == 'main-tests'
+        files = list(filter(utils.is_debug_exe,utils.find_unit_test_binaries(tmpdir)))
+        assert len(files) == 1
+        files[0].name == 'main-tests'
+
+
+        config["run_tests/args/*-tests"] = ['one','two']
+
+        steps.run_tests(config,run=False)
+
+        script_text = (tmpdir/"Project1/04-run_tests").read_text()
+        script_lines = script_text.split('\n')
+
+        assert len(script_lines) == 4
+        assert script_lines[0] == "set -e"
+        assert script_lines[1] == "cd "+str(tmpdir/"Project1")
+        assert script_lines[2] == "cd build-test"
+        assert script_lines[3] == "./main-tests one two"
+
+        cmd = utils.cmd_to_run_shell_script(tmpdir/"Project1/04-run_tests")
+        res = subprocess.run(cmd,capture_output=True)
+        assert res.returncode == 0
+        assert res.stdout.decode('utf-8') == "works one two"
 

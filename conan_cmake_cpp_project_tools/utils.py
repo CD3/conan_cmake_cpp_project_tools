@@ -6,6 +6,8 @@ import os
 import subprocess
 import fnmatch
 
+encoding = 'utf-8'
+
 class working_directory:
     '''
     A context manager to temporarily change the current working directory.
@@ -92,6 +94,17 @@ def is_exe(path):
 
   return False
 
+def is_debug_exe(path:pathlib.Path):
+  '''
+  Return true if the file is a debug-able executable.
+  '''
+  if is_exe(path):
+    if platform.system().lower() == "linux":
+      ret = subprocess.check_output(["file",str(path.absolute())])
+      return ret.decode(encoding).find("with debug_info") > -1
+
+  return False
+
 def is_git_repo(path : pathlib.Path):
     '''
     Return true if path is part of a git repository.
@@ -100,7 +113,7 @@ def is_git_repo(path : pathlib.Path):
     if git is not None:
         with working_directory(path):
             result = subprocess.run([git,'rev-parse','--is-inside-work-tree'],capture_output=True)
-            output = result.stdout.decode('utf-8').strip()
+            output = result.stdout.decode(encoding).strip()
             if result.returncode == 0 and output == "true":
                 return True
 
@@ -120,14 +133,14 @@ def get_source_files(path : pathlib.Path, filt = lambda f: True):
         git = shutil.which('git')
         with working_directory(path):
             result = subprocess.run([git,'ls-files'],capture_output=True)
-        files = result.stdout.strip().decode('utf-8').split('\n')
+        files = result.stdout.strip().decode(encoding).split('\n')
     else:
         fd = shutil.which('fd')
         if fd is not None:
             with working_directory(path):
                 result = subprocess.run([fd,'.','-t','f'],capture_output=True)
                 
-            files = result.stdout.decode('utf-8').strip().split('\n')
+            files = result.stdout.decode(encoding).strip().split('\n')
         else:
             files = path.glob('**/*')
 
@@ -147,5 +160,19 @@ def make_file_matches_pattern_filter(*patterns):
         return False
 
     return matches
+
+def find_unit_test_binaries(dir:pathlib.Path, filters = lambda f : 'test' in f.stem.lower()):
+    if type(filters) is not list:
+        filters = [filters]
+    filt  = lambda p : all([ f(p) for f in filters ])
+
+    return filter( filt, filter( is_exe, dir.glob("**/*") ) )
+
+
+def parse_option_to_config_entry(option_string:str):
+    key,val = option_string.split('=')
+    key = key.strip().strip("'").strip('"')
+    val = val.strip().strip("'").strip('"')
+    return key,val
 
 

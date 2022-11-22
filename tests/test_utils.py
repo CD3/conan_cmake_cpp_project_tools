@@ -3,6 +3,7 @@ import platform
 import shutil
 import pathlib
 import os
+import stat
 import tempfile
 
 def test_running_scripts():
@@ -110,8 +111,6 @@ def test_working_directory_context_manager():
             assert os.getcwd() == tmpdir
         assert os.getcwd() == cwd
 
-
-
 def test_list_source_files():
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -137,4 +136,51 @@ def test_list_source_files():
 
         files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.make_file_matches_pattern_filter('*.txt','*.bin') ))
         assert len(files) == 7
+
+        files = list(utils.get_source_files(pathlib.Path(tmpdir), lambda p : utils.make_file_matches_pattern_filter('*.txt','*.bin')(p) and not utils.make_file_matches_pattern_filter('*.txt')(p) ))
+        assert len(files) == 2
+
+
+
+def test_cmd_option_cfg_entry_parsing():
+
+    key,val = utils.parse_option_to_config_entry("/directories/build=/home/user/build")
+    assert key == '/directories/build'
+    assert val == '/home/user/build'
+
+    key,val = utils.parse_option_to_config_entry("/directories/build = /home/user/build")
+    assert key == '/directories/build'
+    assert val == '/home/user/build'
+
+    key,val = utils.parse_option_to_config_entry(''''/directories/build ' = " /home/user/build"''')
+    assert key == '/directories/build '
+    assert val == ' /home/user/build'
+
+def test_find_test_binaries():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        (pathlib.Path(tmpdir) / "a/b/c/d/e").mkdir(parents=True)
+        files = ['a/b/c/d/e/unit-tests', 'a/b/c/d/e/build-script', 'a/b/c/d/project-CatchTests']
+
+        for file in files:
+            file = pathlib.Path(tmpdir) / file
+            file.write_text('')
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir)))
+        assert len(tests_binaries) == 0
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), filters=lambda f: 'build' in f.name))
+        assert len(tests_binaries) == 0
+
+        for file in files:
+            file = pathlib.Path(tmpdir) / file
+            os.chmod(file, os.stat(file).st_mode | stat.S_IEXEC)
+
+
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir)))
+        assert len(tests_binaries) == 2
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), filters=lambda f: 'build' in f.name))
+        assert len(tests_binaries) == 1
+
 

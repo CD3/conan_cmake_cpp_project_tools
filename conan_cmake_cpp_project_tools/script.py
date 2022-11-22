@@ -81,28 +81,48 @@ class CmdGenerator:
 
         return shlex.join(cmd)
 
-    def activate_environment(self,script_dir:pathlib.Path,source_dir:pathlib.Path):
-        for venv_script,system in [ ('activate.sh','linux'), ('activate.ps1','windows') ]:
-            if (script_dir/venv_script).exists() and platform.system().lower() == system:
-                return self.source(relpath(script_dir/venv_script,source_dir))
+    def source_scripts_if_present_for_system(self,scripts,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        lines = []
+        for script,system in scripts:
+            script = script_dir/script
+            if script.exists() and self.system == system:
+                lines.append( self.source(relpath(script,source_from_dir)) )
+        if len(lines):
+            return '\n'.join(lines)
 
-    def deactivate_environment(self,script_dir:pathlib.Path,source_dir:pathlib.Path):
-        for venv_script,system in [ ('deactivate.sh','linux'), ('deactivate.ps1','windows') ]:
-            if (script_dir/venv_script).exists() and platform.system().lower() == system:
-                return self.source(relpath(script_dir/venv_script,source_dir))
+    def activate_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('activate.sh','linux'), ('activate.ps1','windows') ], script_dir, source_from_dir )
+
+    def deactivate_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('deactivate.sh','linux'), ('deactivate.ps1','windows') ], script_dir, source_from_dir )
+
+    def activate_run_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('activate_run.sh','linux'), ('activate_run.ps1','windows') ], script_dir, source_from_dir )
+
+    def deactivate_run_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('deactivate_run.sh','linux'), ('deactivate_run.ps1','windows') ], script_dir, source_from_dir )
+
+    def activate_build_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('activate_build.sh','linux'), ('activate_build.ps1','windows') ], script_dir, source_from_dir )
+
+    def deactivate_build_environment(self,script_dir:pathlib.Path,source_from_dir:pathlib.Path):
+        return self.source_scripts_if_present_for_system( [ ('deactivate_build.sh','linux'), ('deactivate_build.ps1','windows') ], script_dir, source_from_dir )
+
 
     def enable_exit_on_error(self):
         if self.shell.name == "bash":
             return "set -e"
 
-    def call(self,filename:pathlib.Path,call_dir:pathlib.Path):
+    def call(self,filename:pathlib.Path,call_dir:pathlib.Path,args):
         '''
         Generate command to call a file from a given directory.
         '''
         rel_filename = relpath(filename,call_dir)
         if self.shell.name == "bash":
-            return "./"+rel_filename
+            rel_filename = "./"+rel_filename
+        else:
+            raise RuntimeError(f"Could not find a way to run '{filename}'.")
 
-        raise RuntimeError(f"Could not find a way to run '{filename}'.")
+        return shlex.join([rel_filename] + args)
 
 

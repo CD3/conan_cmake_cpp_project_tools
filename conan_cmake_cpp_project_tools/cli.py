@@ -75,7 +75,6 @@ def run_step_if_pending(name,error_msg,force_run=False):
     else:
         progress[f'/steps/{name}'] = "complete"
     
-
 @app.command()
 def install_deps(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
     '''
@@ -160,6 +159,38 @@ def install(install_dir:pathlib.Path,force:bool=typer.Option(False,"-f",help="Fo
             if steps.install(cfg) != 0:
                 print("[red]There was an error installing.[/red]")
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
+
+@app.command()
+def debug_tests(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
+    '''
+    Run project unit tests through a debugger.
+    '''
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        if not cfg.get('directories/scripts',False):
+            cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
+        with utils.working_directory(tmpdir):
+            run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force)
+            run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force)
+            run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=True)
+            run_step_if_pending('debug_tests',"[red]There was an error running tests through debugger.[/red]",force_run=True)
+
+    cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
+
+
+@app.command()
+def add():
+    '''
+    Add a dependency to the project.
+    '''
+    pass
+
+@app.command()
+def make_editable():
+    '''
+    Create an editable Conan package for the project.
+    '''
+    pass
 
 @app.command()
 def list_sources():

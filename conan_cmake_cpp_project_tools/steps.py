@@ -3,6 +3,8 @@ from .script import Script, CmdGenerator
 import tempfile
 import platform
 import subprocess
+import fnmatch
+import typer
 from os.path import relpath
 from .config import fspathtree
 
@@ -138,20 +140,79 @@ def run_tests(config:fspathtree,run=True):
     with working_directory(config['directories/scripts']):
         script.cd(bdir.parent)
         script.cd(relpath(bdir,bdir.parent))
-        # not sure if we should load this, or a runtime environment?
-        # script.activate_environment(bdir,bdir)
+        script.activate_run_environment(bdir,bdir)
 
-        exes = filter( is_exe, bdir.glob("**/*") )
-        test_execs = filter( lambda f : 'test' in f.stem.lower(), exes )
+        test_exes = find_unit_test_binaries(bdir)
 
-        for exe in test_execs:
+        for exe in test_exes:
             print("Found test executable:",exe)
-            script.call(exe,bdir)
+            args = []
+            for pattern in config.get('/run_tests/args',fspathtree([])).tree:
+                if fnmatch.fnmatch(exe,pattern):
+                    args = config[f'run_tests/args/{pattern}'].tree
+
+
+            script.call(exe,bdir,args)
 
 
         script.write(pathlib.Path(script_filename),exit_on_error=True)
 
-        # script.activate_environment(bdir,bdir)
+        script.deactivate_run_environment(bdir,bdir)
+        
+        if run:
+            cmd = cmd_to_run_shell_script(script_filename)
+            result = subprocess.run(cmd)
+            return result.returncode
+
+
+def debug_tests(config:fspathtree,run=True):
+    if config.get('directories/build',None) is None:
+        raise RuntimeError("No build directory given. Cannot run configure_build step.")
+
+    bdir = config['directories/build'].absolute()
+
+    if not bdir.exists():
+        raise RuntimeError(f"The build directory '{bdir}' has not been created yet.")
+
+    cmd_generator = CmdGenerator(config.get('platform',None))
+    script = Script( system=config.get('/system',get_system()), shell=config.get('/shell', get_shell()) )
+    script_filename = config.get('run_build/script_filename','05-debug_tests')
+
+    with working_directory(config['directories/scripts']):
+        script.cd(bdir.parent)
+        script.cd(relpath(bdir,bdir.parent))
+        script.activate_run_environment(bdir,bdir)
+
+        test_exes = list(filter(is_debug_exe, find_unit_test_binaries(bdir)))
+        if len(test_exes) < 1:
+            print("Did not find any test executables with debug symbols.")
+
+        choice = 0
+        if len(test_exes) > 1:
+            print("Found multiple test executables. Which one do you want to debug?")
+            typer.promp("Select exe",choice)
+            while choice < 0 or choice >= len(test_exes):
+                choice = 0
+                typer.promp(f"Please choose number between 0 and {len(test_exes)-1}",choice)
+        
+        exe = test_exes[choice]
+
+        print("Found test executable:",exe)
+        args = []
+        for pattern in config.get('/debug_tests/args',fspathtree([])).tree:
+            if fnmatch.fnmatch(exe,pattern):
+                args = config[f'debug_tests/args/{pattern}'].tree
+
+        debugger = config.get('/debug_tests/debugger/cmd','gdb')
+        debugger_args = config.get('/debug_tests/debugger/args',['-tui'])
+        cmd = [ debugger ] + debugger_args + [str(exe)] +  args
+
+        script.add_command( shlex.join(cmd) )
+
+
+        script.write(pathlib.Path(script_filename),exit_on_error=True)
+
+        script.deactivate_run_environment(bdir,bdir)
         
         if run:
             cmd = cmd_to_run_shell_script(script_filename)
