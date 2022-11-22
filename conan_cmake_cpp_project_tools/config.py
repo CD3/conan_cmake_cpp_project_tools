@@ -40,6 +40,27 @@ def set_defaults( cfg: fspathtree, overwrite:bool = True):
     if overwrite or cfg.get('/shell',None) is None:
         cfg['/shell'] = get_shell()
 
+    if overwrite or cfg.get('/run_tests/args',None) is None:
+        cfg['/run_tests/args/*'] = None
+
+    if overwrite or cfg.get('/run_tests/include',None) is None:
+        cfg['/run_tests/include'] = '*'
+
+    if overwrite or cfg.get('/run_tests/exclude',None) is None:
+        cfg['/run_tests/exclude'] = None
+
+    # if overwrite or cfg.get('/conan/args',None) is None:
+    #     args = ['install','{conan_dir}','-pr:b=default','-s','build_type={build_type}']
+    #     cfg['/conan/default_args'] = args
+
+    # if overwrite or cfg.get('/cmake/default_args',None) is None:
+    #     args = ["{cmake_dir}", "-DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake if (build_dir/'conan_toolchain.cmake').exists()", "-DCMAKE_BUILD_TYPE={build_type}"]
+    #     cfg['/cmake/default_args'] = args
+
+    # if overwrite or cfg.get('/cmake/build/default_args',None) is None:
+    #     args = ["--build","."]
+    #     cfg['/cmake/build/default_args'] = args
+
 
 
 def set_default_build_dir(cfg:fspathtree):

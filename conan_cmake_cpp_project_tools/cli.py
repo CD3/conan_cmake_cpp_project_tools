@@ -1,4 +1,5 @@
 import typer
+import typing
 import pathlib
 import tempfile
 import fnmatch
@@ -23,6 +24,7 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
         ,conanfile:pathlib.Path=typer.Option(None,help='The conanfile (conanfile.txt|conanfile.py) to install dependencies with. Detected by default.')
         ,cmakefile:pathlib.Path=typer.Option(None,help='The CMakeLists.txt file to use.')
         ,write_scripts:bool=typer.Option(False,"--write-scripts","-w",help='Write shell scripts to perform each build/test phase.')
+        ,config_settings:typing.Optional[typing.List[str]] = typer.Option(None,help='Override project configuration settings.')
         ):
 
     if release:
@@ -57,9 +59,16 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
     if cfg.get('/files/progress',None) is None:
         cfg['/files/progress'] = cfg['directories/build'] / 'ccc-progress.yml'
 
+    if config_settings:
+        for config_setting in config_settings:
+            settings = utils.parse_option_to_config_entry(config_setting)
+            for key in settings:
+                cfg[key] = settings[key]
+
     if not cfg['/files/progress'].exists():
         cfg['/files/progress'].parent.mkdir(parents=True,exist_ok=True)
         cfg['/files/progress'].write_text('{}')
+
 
     progress.tree.update( yaml.safe_load( cfg['/files/progress'].read_text() ) )
 
@@ -179,6 +188,26 @@ def debug_tests(force:bool=typer.Option(False,"-f",help="Force all steps to run,
                         run_step_if_pending('debug_tests',"[red]There was an error running tests through debugger.[/red]",force_run=True)
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
+
+@app.command()
+def info():
+    '''
+    Print some information about the project.
+    '''
+
+    print("directories:")
+    print("\troot:",cfg['/directories/root'])
+    print("\tbuild:",cfg['/directories/build'])
+    print("files:")
+    print("\tconan:",cfg['/files/conanfile'])
+    print("\tcmake:",cfg['/files/CMakeLists.txt'])
+
+    print()
+    print("all configuration settings")
+    for key in cfg.get_all_leaf_node_paths():
+        val = cfg[key]
+        print(key,':',val)
+
 
 
 @app.command()

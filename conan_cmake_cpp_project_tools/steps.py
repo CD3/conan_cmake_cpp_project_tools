@@ -28,9 +28,9 @@ def install_deps(config:fspathtree,run=True):
         build_type = config.get('build_type','Debug')
 
         conan_cmd = [ config.get('conan/cmd','conan') ]
-        default_args = ['install','{conan_dir}','-pr:b=default','-s',f'build_type={build_type}']
-        conan_cmd += [ arg.format(conan_dir=relpath(cdir,bdir)) for arg in config.get('conan/args',fspathtree(default_args)).tree ]
-        conan_cmd += [ arg.format(conan_dir=relpath(cdir,bdir)) for arg in config.get('conan/extra_args',fspathtree([])).tree ]
+        default_args = ['install','{conan_dir}','-pr:b=default','-s','build_type={build_type}']
+        conan_cmd += [ arg.format(conan_dir=relpath(cdir,bdir),build_type=build_type) for arg in config.get('conan/args',fspathtree(default_args)).tree ]
+        conan_cmd += [ arg.format(conan_dir=relpath(cdir,bdir),build_type=build_type) for arg in config.get('conan/extra_args',fspathtree([])).tree ]
 
 
         script.add_command( conan_cmd )
@@ -72,9 +72,9 @@ def configure_build(config:fspathtree,run=True):
         default_args = ["{cmake_dir}"]
         if (bdir/"conan_toolchain.cmake").exists():
             default_args += ["-DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake"]
-        default_args += [f"-DCMAKE_BUILD_TYPE={build_type}"]
-        cmake_cmd += [ arg.format(cmake_dir=relpath(cdir,bdir)) for arg in config.get('cmake/args',fspathtree(default_args)).tree ]
-        cmake_cmd += [ arg.format(cmake_dir=relpath(cdir,bdir)) for arg in config.get('cmake/extra_args',fspathtree([])).tree ]
+        default_args += ["-DCMAKE_BUILD_TYPE={build_type}"]
+        cmake_cmd += [ arg.format(cmake_dir=relpath(cdir,bdir),build_type=build_type) for arg in config.get('cmake/args',fspathtree(default_args)).tree ]
+        cmake_cmd += [ arg.format(cmake_dir=relpath(cdir,bdir),build_type=build_type) for arg in config.get('cmake/extra_args',fspathtree([])).tree ]
 
         script.add_command( cmake_cmd )
 
@@ -144,12 +144,38 @@ def run_tests(config:fspathtree,run=True):
 
         test_exes = find_unit_test_binaries(bdir)
 
+        include_patterns = config.get('/run_tests/include','*')
+        exclude_patterns = config.get('/run_tests/exclude',None)
+        if type(include_patterns) is str:
+            include_patterns = [include_patterns]
+        if type(exclude_patterns) is str:
+            exclude_patterns = [exclude_patterns]
+        if exclude_patterns is None:
+            exclude_patterns = []
+        if type(include_patterns) == fspathtree:
+            include_patterns = include_patterns.tree
+        if type(exclude_patterns) == fspathtree:
+            exclude_patterns = exclude_patterns.tree
+
         for exe in test_exes:
+            include = any([ fnmatch.fnmatch(exe,pattern) for pattern in include_patterns ])
+            exclude = any([ fnmatch.fnmatch(exe,pattern) for pattern in exclude_patterns ])
+            if not include:
+                print(f"Found test executable '{exe}', but it was not included by /run_tests/include pattern(s)." )
+                continue
+            if exclude:
+                print(f"Found test executable '{exe}', but it was _excluded_ by /run_tests/exclude pattern(s)." )
+                continue
+
             print("Found test executable:",exe)
             args = []
             for pattern in config.get('/run_tests/args',fspathtree([])).tree:
                 if fnmatch.fnmatch(exe,pattern):
-                    args = config[f'run_tests/args/{pattern}'].tree
+                    if config[f'run_tests/args/{pattern}'] is not None:
+                        if type(config[f'run_tests/args/{pattern}']) == str:
+                            args = [config[f'run_tests/args/{pattern}']]
+                        else:
+                            args = config[f'run_tests/args/{pattern}'].tree
 
 
             script.call(exe,bdir,args)

@@ -5,6 +5,7 @@ import platform
 import os
 import subprocess
 import fnmatch
+import yaml
 
 encoding = 'utf-8'
 
@@ -170,9 +171,7 @@ def find_unit_test_binaries(dir:pathlib.Path, filters = lambda f : 'test' in f.s
 
 
 def parse_option_to_config_entry(option_string:str):
-    key,val = option_string.split('=')
-    key = key.strip().strip("'").strip('"')
-    val = val.strip().strip("'").strip('"')
-    return key,val
+    data = yaml.safe_load(option_string)
+    return data
 
 

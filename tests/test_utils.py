@@ -144,17 +144,18 @@ def test_list_source_files():
 
 def test_cmd_option_cfg_entry_parsing():
 
-    key,val = utils.parse_option_to_config_entry("/directories/build=/home/user/build")
-    assert key == '/directories/build'
-    assert val == '/home/user/build'
+    data = utils.parse_option_to_config_entry("/directories/build : /home/user/build")
+    assert '/directories/build' in data
+    assert data['/directories/build'] == '/home/user/build'
 
-    key,val = utils.parse_option_to_config_entry("/directories/build = /home/user/build")
-    assert key == '/directories/build'
-    assert val == '/home/user/build'
+    data = utils.parse_option_to_config_entry(''''/directories/build ' : " /home/user/build"''')
+    assert '/directories/build ' in data
+    assert data['/directories/build '] == ' /home/user/build'
 
-    key,val = utils.parse_option_to_config_entry(''''/directories/build ' = " /home/user/build"''')
-    assert key == '/directories/build '
-    assert val == ' /home/user/build'
+    data = utils.parse_option_to_config_entry(''''/list' : ["a","b"]''')
+    assert '/list' in data
+    assert len(data['/list']) == 2
+    assert type(data['/list']) == list
 
 def test_find_test_binaries():
     with tempfile.TemporaryDirectory() as tmpdir:
