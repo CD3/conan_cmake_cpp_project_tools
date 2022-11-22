@@ -1,5 +1,7 @@
 # Clark's Conan, CMake, C++ Project Tools
 
+**Note: this is a rewrite of a another project [https://github.com/CD3/cccpt](https://github.com/CD3/cccpt) and does not fully support Windows yet.**
+
 This project started out as a collection of small scripts to automate the configure, build, and testing steps of
 C++ projects I work on. It has since grown to include several small utilities that I have found useful while
 working on C++ projects.
