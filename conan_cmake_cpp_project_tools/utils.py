@@ -6,6 +6,8 @@ import os
 import subprocess
 import fnmatch
 import yaml
+import typing
+from fspathtree import fspathtree
 
 encoding = 'utf-8'
 
@@ -162,12 +164,65 @@ def make_file_matches_pattern_filter(*patterns):
 
     return matches
 
-def find_unit_test_binaries(dir:pathlib.Path, filters = lambda f : 'test' in f.stem.lower()):
+def find_unit_test_binaries(dir_to_search:pathlib.Path, filters = is_exe, include_patterns = ['*test*','*Test*'], exclude_patterns = []):
+    '''
+    Return a iterator of unit test binaries.
+    '''
+    sorted_files = sort_paths( dir_to_search.glob('**/*'), filters, include_patterns, exclude_patterns )
+    for file in sorted_files['included']:
+        yield file
+
+def sort_paths(paths:typing.List[pathlib.Path], filters = None, include_patterns = None, exclude_patterns = None):
+    '''
+    Sorts a list of paths into "include", "exclude" and "removed with filter".
+
+    @param filters : a list of filters, i.e. functions that take a path argument and return True if it should be "kept"
+    @param include_patterns : a list of glob-style patterns for matching paths that will be "kept". paths that match any _one_ pattern will be included.
+    @param exclude_patterns : a list of glob-style patterns for matching paths that will be "kept". paths that match any _one_ pattern will be excluded.
+
+    Files are sorted by first appling all filters, then checking the include patterns, and then checking the exclude patterns.
+    '''
+
+    # set defaults
+    if filters is None:
+        filters = [lambda p : True]
+    if include_patterns is None:
+        include_patterns = ['*']
+    if exclude_patterns is None:
+        exclude_patterns = []
+
+    # turn fspathtrees into lists
+    if type(filters) == fspathtree:
+        filters = filters.tree
+    if type(include_patterns) == fspathtree:
+        include_patterns = include_patterns.tree
+    if type(exclude_patterns) == fspathtree:
+        exclude_patterns = exclude_patterns.tree
+
+    # turn single elements into lists
     if type(filters) is not list:
         filters = [filters]
-    filt  = lambda p : all([ f(p) for f in filters ])
+    if type(include_patterns) is not list:
+        include_patterns = [include_patterns]
+    if type(exclude_patterns) is not list:
+        exclude_patterns = [exclude_patterns]
 
-    return filter( filt, filter( is_exe, dir.glob("**/*") ) )
+
+    sorted_paths = {"included":[],"excluded":[],"removed by filter":[],"unspecified":[]}
+
+    for path in paths:
+        category = "unspecified"
+        if any([ not f(path) for f in filters ]):
+            category = "removed by filter"
+        else:
+            if any([ fnmatch.fnmatch(path.stem,pattern) for pattern in include_patterns ]):
+                category = "included"
+            if any([ fnmatch.fnmatch(path.stem,pattern) for pattern in exclude_patterns ]):
+                category = "excluded"
+
+        sorted_paths[category].append(path)
+
+    return sorted_paths
 
 
 def parse_option_to_config_entry(option_string:str):

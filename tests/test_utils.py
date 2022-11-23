@@ -169,7 +169,10 @@ def test_find_test_binaries():
         tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir)))
         assert len(tests_binaries) == 0
 
-        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), filters=lambda f: 'build' in f.name))
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), include_patterns='*build*'))
+        assert len(tests_binaries) == 0
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), include_patterns='*build*', exclude_patterns=['*']))
         assert len(tests_binaries) == 0
 
         for file in files:
@@ -181,7 +184,10 @@ def test_find_test_binaries():
         tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir)))
         assert len(tests_binaries) == 2
 
-        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), filters=lambda f: 'build' in f.name))
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), include_patterns=['*build*']))
         assert len(tests_binaries) == 1
+
+        tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), include_patterns='*build*', exclude_patterns=['*']))
+        assert len(tests_binaries) == 0
 
 

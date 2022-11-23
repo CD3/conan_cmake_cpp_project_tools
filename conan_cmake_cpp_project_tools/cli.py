@@ -112,7 +112,7 @@ def configure(force:bool=typer.Option(False,"-f",help="Force all steps to run, e
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force) == 0:
+            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting.[/red]",force_run=force) == 0:
                 run_step_if_pending('configure_build',"[red]There was an error configuring build.[/red]",force_run=force)
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
@@ -127,27 +127,35 @@ def build(force:bool=typer.Option(False,"-f",help="Force all steps to run, even 
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force) == 0:
-                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force) == 0:
+            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting.[/red]",force_run=force) == 0:
+                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting.[/red]",force_run=force) == 0:
                     run_step_if_pending('run_build',"[red]There was an error running build.[/red]",force_run=True)
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 
 # we are not naming this function `test` because pytest will pick it up as a test to run, which it is not.
 @app.command(name="test")
-def run_test(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
+def run_test(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")
+        , include:typing.Optional[typing.List[str]] = typer.Option(None,"--include","-i",help="Include pattern(s) to filter test executables that will run.")
+        , exclude:typing.Optional[typing.List[str]] = typer.Option(None,"--exclude","-x",help="Exclude pattern(s) to filter test executables that will run.")
+        ):
     '''
     Run project unit tests.
     '''
+    if include:
+        cfg['/run_tests/include'] = include
+    if exclude:
+        cfg['/run_tests/exclude'] = exclude
 
     with tempfile.TemporaryDirectory() as tmpdir:
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force) == 0:
-                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force) == 0:
-                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=True) == 0:
-                        run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=True)
+            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting.[/red]",force_run=force) == 0:
+                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting.[/red]",force_run=force) == 0:
+                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting.[/red]",force_run=True) == 0:
+                        if run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=True) == 0:
+                            print("[green]All tests passed[/green]")
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
@@ -164,27 +172,35 @@ def install(install_dir:pathlib.Path,force:bool=typer.Option(False,"-f",help="Fo
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force) == 0:
-                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force) == 0:
-                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=force) == 0:
+            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting.[/red]",force_run=force) == 0:
+                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting.[/red]",force_run=force) == 0:
+                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting.[/red]",force_run=force) == 0:
                         if run_step_if_pending('run_tests',"[red]There was an error running tests.[/red]",force_run=force) == 0:
                             if steps.install(cfg) != 0:
                                 print("[red]There was an error installing.[/red]")
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 @app.command()
-def debug_tests(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")):
+def debug_tests(force:bool=typer.Option(False,"-f",help="Force all steps to run, even if it has been completed.")
+        , include:typing.Optional[typing.List[str]] = typer.Option(None,"--include","-i",help="Include pattern(s) to filter test executables that will run.")
+        , exclude:typing.Optional[typing.List[str]] = typer.Option(None,"--exclude","-x",help="Exclude pattern(s) to filter test executables that will run.")
+        ):
     '''
     Run project unit tests through a debugger.
     '''
+
+    if include:
+        cfg['/run_tests/include'] = include
+    if exclude:
+        cfg['/run_tests/exclude'] = exclude
 
     with tempfile.TemporaryDirectory() as tmpdir:
         if not cfg.get('directories/scripts',False):
             cfg['directories/scripts'] = pathlib.Path(tmpdir).absolute()
         with utils.working_directory(tmpdir):
-            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting[/red]",force_run=force) == 0:
-                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting[/red]",force_run=force) == 0:
-                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting[/red]",force_run=True) == 0:
+            if run_step_if_pending('install_deps',"[red]There was an error installing dependencies. Halting.[/red]",force_run=force) == 0:
+                if run_step_if_pending('configure_build',"[red]There was an error configuring build. Halting.[/red]",force_run=force) == 0:
+                    if run_step_if_pending('run_build',"[red]There was an error running build. Halting.[/red]",force_run=True) == 0:
                         run_step_if_pending('debug_tests',"[red]There was an error running tests through debugger.[/red]",force_run=True)
 
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )

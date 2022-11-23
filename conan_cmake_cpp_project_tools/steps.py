@@ -142,31 +142,13 @@ def run_tests(config:fspathtree,run=True):
         script.cd(relpath(bdir,bdir.parent))
         script.activate_run_environment(bdir,bdir)
 
-        test_exes = find_unit_test_binaries(bdir)
-
-        include_patterns = config.get('/run_tests/include','*')
-        exclude_patterns = config.get('/run_tests/exclude',None)
-        if type(include_patterns) is str:
-            include_patterns = [include_patterns]
-        if type(exclude_patterns) is str:
-            exclude_patterns = [exclude_patterns]
-        if exclude_patterns is None:
-            exclude_patterns = []
-        if type(include_patterns) == fspathtree:
-            include_patterns = include_patterns.tree
-        if type(exclude_patterns) == fspathtree:
-            exclude_patterns = exclude_patterns.tree
+        test_exes = find_unit_test_binaries(bdir,
+                filters=lambda p : p.is_file() and is_exe(p),
+                include_patterns=config.get('/run_tests/include',['*test*','*Test*']),
+                exclude_patterns=config.get('/run_tests/exclude',[])
+                )
 
         for exe in test_exes:
-            include = any([ fnmatch.fnmatch(exe,pattern) for pattern in include_patterns ])
-            exclude = any([ fnmatch.fnmatch(exe,pattern) for pattern in exclude_patterns ])
-            if not include:
-                print(f"Found test executable '{exe}', but it was not included by /run_tests/include pattern(s)." )
-                continue
-            if exclude:
-                print(f"Found test executable '{exe}', but it was _excluded_ by /run_tests/exclude pattern(s)." )
-                continue
-
             print("Found test executable:",exe)
             args = []
             for pattern in config.get('/run_tests/args',fspathtree([])).tree:
@@ -209,17 +191,26 @@ def debug_tests(config:fspathtree,run=True):
         script.cd(relpath(bdir,bdir.parent))
         script.activate_run_environment(bdir,bdir)
 
-        test_exes = list(filter(is_debug_exe, find_unit_test_binaries(bdir)))
+        test_exes = list(find_unit_test_binaries(bdir,
+                filters=lambda p : p.is_file() and is_debug_exe(p),
+                include_patterns=config.get('/run_tests/include',['*test*','*Test*']),
+                exclude_patterns=config.get('/run_tests/exclude',[])
+                ))
+
+
         if len(test_exes) < 1:
             print("Did not find any test executables with debug symbols.")
 
         choice = 0
         if len(test_exes) > 1:
             print("Found multiple test executables. Which one do you want to debug?")
-            typer.promp("Select exe",choice)
+            for i,exe in enumerate(test_exes):
+                print(i,exe)
+            choice = typer.prompt("Select exe",choice)
+            print(choice)
             while choice < 0 or choice >= len(test_exes):
                 choice = 0
-                typer.promp(f"Please choose number between 0 and {len(test_exes)-1}",choice)
+                choice = typer.prompt(f"Please choose number between 0 and {len(test_exes)-1}",choice)
         
         exe = test_exes[choice]
 
