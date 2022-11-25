@@ -1,8 +1,7 @@
-from conan_cmake_cpp_project_tools import utils,steps,script
+from conan_cmake_cpp_project_tools import utils,steps,script,config
 import tempfile
 import pathlib
 import subprocess
-import fspathtree
 
 def test_command_generator():
     cmd_generator = script.CmdGenerator("linux")
@@ -51,17 +50,20 @@ int main(int argc, char* argv[])
         ''')
 
 
-        config = fspathtree.fspathtree()
+        cfg = config.ConfSettings()
+        cfg.allow_missing_keys(True)
 
-        config["directories/root"] = tmpdir/"Project1"
-        config["directories/build"] = tmpdir/"Project1/build-test"
-        config["directories/scripts"] = tmpdir/"Project1"
-        config["files/conanfile"] = tmpdir/"Project1/conanfile.txt"
-        config["files/CMakeLists.txt"] = tmpdir/"Project1/CMakeLists.txt"
-        config["platform"] = "linux"
+        cfg["/directories/root"] = tmpdir/"Project1"
+        cfg["/directories/build"] = tmpdir/"Project1/build-test"
+        cfg["/directories/scripts"] = tmpdir/"Project1"
+        cfg["/files/conanfile"] = tmpdir/"Project1/conanfile.txt"
+        cfg["/files/CMakeLists.txt"] = tmpdir/"Project1/CMakeLists.txt"
+        cfg["/system"] = "linux"
+        cfg["/shell"] = "bash"
+        cfg["/build_type"] = "Debug"
 
 
-        steps.install_deps(config,run=False)
+        steps.install_deps(cfg,run=False)
 
         script_text = (tmpdir/"Project1/01-install_deps").read_text()
         script_lines = script_text.split('\n')
@@ -74,9 +76,9 @@ int main(int argc, char* argv[])
         assert script_lines[4] == "conan install .. -pr:b=default -s build_type=Debug"
 
 
-        config["conan/extra_args"] = ["-j","build-info-tree.json"]
+        cfg["/conan/extra_args"] = ["-j","build-info-tree.json"]
 
-        steps.install_deps(config,run=False)
+        steps.install_deps(cfg,run=False)
 
         script_text = (tmpdir/"Project1/01-install_deps").read_text()
         script_lines = script_text.split('\n')
@@ -92,7 +94,7 @@ int main(int argc, char* argv[])
         res = subprocess.run(cmd)
         assert res.returncode == 0
 
-        steps.configure_build(config,run=False)
+        steps.configure_build(cfg,run=False)
 
         script_text = (tmpdir/"Project1/02-configure_build").read_text()
         script_lines = script_text.split('\n')
@@ -107,7 +109,7 @@ int main(int argc, char* argv[])
 echo "activating virtual environment"
         ''')
 
-        steps.configure_build(config,run=False)
+        steps.configure_build(cfg,run=False)
 
         script_text = (tmpdir/"Project1/02-configure_build").read_text()
         script_lines = script_text.split('\n')
@@ -124,7 +126,7 @@ echo "activating virtual environment"
         (tmpdir / "Project1/build-test/deactivate.sh").write_text('''
         ''')
 
-        steps.configure_build(config,run=False)
+        steps.configure_build(cfg,run=False)
 
         script_text = (tmpdir/"Project1/02-configure_build").read_text()
         script_lines = script_text.split('\n')
@@ -144,7 +146,7 @@ echo "activating virtual environment"
         assert res.returncode == 0
 
 
-        steps.run_build(config,run=False)
+        steps.run_build(cfg,run=False)
 
         script_text = (tmpdir/"Project1/03-run_build").read_text()
         script_lines = script_text.split('\n')
@@ -163,7 +165,7 @@ echo "activating virtual environment"
         assert res.returncode == 0
 
 
-        steps.run_tests(config,run=False)
+        steps.run_tests(cfg,run=False)
 
         script_text = (tmpdir/"Project1/04-run_tests").read_text()
         script_lines = script_text.split('\n')
@@ -189,9 +191,9 @@ echo "activating virtual environment"
         files[0].name == 'main-tests'
 
 
-        config["run_tests/args/*-tests"] = ['one','two']
+        cfg["run_tests/args/*-tests"] = ['one','two']
 
-        steps.run_tests(config,run=False)
+        steps.run_tests(cfg,run=False)
 
         script_text = (tmpdir/"Project1/04-run_tests").read_text()
         script_lines = script_text.split('\n')

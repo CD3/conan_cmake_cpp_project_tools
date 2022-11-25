@@ -7,7 +7,6 @@ import subprocess
 import fnmatch
 import yaml
 import typing
-from fspathtree import fspathtree
 
 encoding = 'utf-8'
 
@@ -191,12 +190,12 @@ def sort_paths(paths:typing.List[pathlib.Path], filters = None, include_patterns
     if exclude_patterns is None:
         exclude_patterns = []
 
-    # turn fspathtrees into lists
-    if type(filters) == fspathtree:
+    # turn ConfSettings into lists (without referencing the type)
+    if hasattr(filters,'tree'):
         filters = filters.tree
-    if type(include_patterns) == fspathtree:
+    if hasattr(include_patterns,"tree"):
         include_patterns = include_patterns.tree
-    if type(exclude_patterns) == fspathtree:
+    if hasattr(exclude_patterns,"tree"):
         exclude_patterns = exclude_patterns.tree
 
     # turn single elements into lists

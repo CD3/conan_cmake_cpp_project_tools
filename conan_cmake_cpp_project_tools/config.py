@@ -2,6 +2,8 @@ from fspathtree import fspathtree
 import pathlib
 from .utils import *
 import yaml
+import shutil
+import os
 
 # /directories/scripts
 # /directories/root
@@ -22,8 +24,40 @@ import yaml
 # /run_build/script_name
 # /run_tests/script_name
 
+class ConfSettings(fspathtree):
+    class Null:
+        def __init__(self,msg=None):
+            self.msg = msg
+        def __repr__(self):
+            if self.msg:
+                return f"<NULL:{self.msg}>"
+            else:
+                return f"<NULL>"
 
-def load_config_files( cfg: fspathtree, root_dir:pathlib.Path, config_file_basename:str):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.__allow_missing_keys = False
+
+    def allow_missing_keys(self,val:bool):
+        self.__allow_missing_keys = bool(val)
+
+    def get(self,key,default_value):
+        '''
+        Override the default fstreepath behavior.
+
+        If `self.strict` is set, then we want to throw an error for missing
+        keys. to throw an error if
+        `self.strict` is set and the key does not exists. 
+        the key does not exists, and the default value if it is an
+        instance of Null.
+        '''
+        val = super().get(key,default_value) if self.__allow_missing_keys else self[key]
+        if type(val) == ConfSettings.Null:
+            val = default_value
+        return val
+
+
+def load_config_files( cfg: ConfSettings, root_dir:pathlib.Path, config_file_basename:str):
     # look for yaml files
     data = {}
     for file in sorted(list(find_file_at_or_above(root_dir,config_file_basename+".yml")),key=lambda p: len(p.parts)):
@@ -32,42 +66,45 @@ def load_config_files( cfg: fspathtree, root_dir:pathlib.Path, config_file_basen
 
     cfg.tree.update(data)
 
-def set_defaults( cfg: fspathtree, overwrite:bool = True):
+def set_defaults( cfg: ConfSettings, overwrite:bool = True):
 
-    if overwrite or cfg.get('/system',None) is None:
-        cfg['/system'] = get_system()
+    def set(key,val):
+        if overwrite or cfg.get(key,None) is None:
+            cfg[key] = val
 
-    if overwrite or cfg.get('/shell',None) is None:
-        cfg['/shell'] = get_shell()
+    set('/system', get_system())
+    set('/shell', get_shell())
+    set('/build_type', ConfSettings.Null())
+    set('/files/progress', ConfSettings.Null())
+    set('/files/conanfile', ConfSettings.Null())
+    set('/files/CMakeLists.txt', ConfSettings.Null())
+    set('/directories/root', ConfSettings.Null())
+    set('/directories/build', ConfSettings.Null())
+    set('/directories/scripts', ConfSettings.Null())
+    set('/conan/cmd', ConfSettings.Null())
+    set('/conan/args', ConfSettings.Null("Will be detected by default."))
+    set('/conan/extra_args', ConfSettings.Null("Pass extra command line arg here."))
+    set('/cmake/cmd', ConfSettings.Null())
+    set('/cmake/args', ConfSettings.Null("Will be detected by default."))
+    set('/cmake/extra_args', ConfSettings.Null("Pass extra command line arg here."))
+    set('/cmake/build/cmd', ConfSettings.Null())
+    set('/cmake/build/args', ConfSettings.Null("Will be detected by default."))
+    set('/cmake/build/extra_args', ConfSettings.Null("Pass extra command line arg here."))
+    set('/run_tests/args', ConfSettings.Null())
+    set('/run_tests/include', '*')
+    set('/run_tests/exclude', ConfSettings.Null())
+    set('/install_deps/script_filename', ConfSettings.Null() )
+    set('/configure_build/script_filename', ConfSettings.Null() )
+    set('/run_build/script_filename', ConfSettings.Null() )
+    set('/run_tests/script_filename', ConfSettings.Null() )
 
-    if overwrite or cfg.get('/run_tests/args',None) is None:
-        cfg['/run_tests/args/*'] = None
-
-    if overwrite or cfg.get('/run_tests/include',None) is None:
-        cfg['/run_tests/include'] = '*'
-
-    if overwrite or cfg.get('/run_tests/exclude',None) is None:
-        cfg['/run_tests/exclude'] = None
-
-    # if overwrite or cfg.get('/conan/args',None) is None:
-    #     args = ['install','{conan_dir}','-pr:b=default','-s','build_type={build_type}']
-    #     cfg['/conan/default_args'] = args
-
-    # if overwrite or cfg.get('/cmake/default_args',None) is None:
-    #     args = ["{cmake_dir}", "-DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake if (build_dir/'conan_toolchain.cmake').exists()", "-DCMAKE_BUILD_TYPE={build_type}"]
-    #     cfg['/cmake/default_args'] = args
-
-    # if overwrite or cfg.get('/cmake/build/default_args',None) is None:
-    #     args = ["--build","."]
-    #     cfg['/cmake/build/default_args'] = args
 
 
-
-def set_default_build_dir(cfg:fspathtree):
+def set_default_build_dir(cfg:ConfSettings):
     cfg['directories/build'] = cfg.get('directories/root',pathlib.Path())/make_build_dir_name(build_type=cfg.get('/build_type','unknown'),system=cfg.get('/system','unknown') )
 
 
-def set_default_conanfile(cfg:fspathtree):
+def set_default_conanfile(cfg:ConfSettings):
     conanfiles = list(find_file_at_or_below(cfg['/directories/root'],"conanfile.py"))
     if len(conanfiles) < 1:
         conanfiles = list(find_file_at_or_below(cfg['/directories/root'],"conanfile.txt"))
@@ -77,7 +114,7 @@ def set_default_conanfile(cfg:fspathtree):
 
 
 
-def set_default_cmakefile(cfg:fspathtree):
+def set_default_cmakefile(cfg:ConfSettings):
     cmakefiles = list(find_file_at_or_below(cfg['/directories/root'],"CMakeLists.txt"))
 
     if len(cmakefiles) > 0:

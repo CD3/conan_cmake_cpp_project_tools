@@ -12,7 +12,7 @@ import conan_cmake_cpp_project_tools.steps as steps
 
 APP_NAME="ccc"
 app = typer.Typer(name=APP_NAME)
-cfg = config.fspathtree()
+cfg = config.ConfSettings()
 progress = config.fspathtree()
 
 
@@ -56,6 +56,7 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
     if write_scripts:
         cfg['directories/scripts'] = cfg['directories/build']
 
+    print(cfg.get('/files/progress',None))
     if cfg.get('/files/progress',None) is None:
         cfg['/files/progress'] = cfg['directories/build'] / 'ccc-progress.yml'
 
@@ -206,7 +207,7 @@ def debug_tests(force:bool=typer.Option(False,"-f",help="Force all steps to run,
     cfg['/files/progress'].write_text( yaml.dump(progress.tree) )
 
 @app.command()
-def info():
+def info(config_settings:bool=typer.Option(False,help="Print all configureations settings.")):
     '''
     Print some information about the project.
     '''
@@ -218,11 +219,12 @@ def info():
     print("\tconan:",cfg['/files/conanfile'])
     print("\tcmake:",cfg['/files/CMakeLists.txt'])
 
-    print()
-    print("all configuration settings")
-    for key in cfg.get_all_leaf_node_paths():
-        val = cfg[key]
-        print(key,':',val)
+    if config_settings:
+        print()
+        print("all configuration settings")
+        for key in cfg.get_all_leaf_node_paths():
+            val = cfg[key]
+            print(key,':',val)
 
 
 
