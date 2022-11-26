@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "conan-cmake-cpp-project-tools"
-version = "0.6"
+version = "0.6.1"
 description = ""
 authors = ["CD Clark III <clifton.clark@gmail.com>"]
 readme = "README.md"
