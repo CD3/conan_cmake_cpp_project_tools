@@ -246,10 +246,11 @@ def list_sources():
     '''
     List the source files in a project.
     '''
-    include_patterns = cfg.get('/list_sources/patterns/include',['*'])
-    exclude_patterns = cfg.get('/list_sources/patterns/exclude',[])
+    include_patterns = cfg.get('/list_sources/include',config.ConfSettings(['*'])).tree
+    exclude_patterns = cfg.get('/list_sources/exclude',config.ConfSettings([])).tree
     
 
-    for file in utils.get_source_files(cfg['/directories/root'], lambda p : utils.make_file_matches_pattern_filter(*include_patterns) and not utils.make_file_matches_pattern_filter(*exclude_patterns)):
+    sources = utils.get_source_files(cfg['/directories/root']) | utils.pfilter(utils.filename_matches_pattern_filter(include_patterns)) | -utils.pfilter(utils.filename_matches_pattern_filter(exclude_patterns))
+    for file in sources:
         print(str(file))
 

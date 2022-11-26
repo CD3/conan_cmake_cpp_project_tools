@@ -98,6 +98,8 @@ def set_defaults( cfg: ConfSettings, overwrite:bool = True):
     set('/debug_tests/exclude', ['*/CMakeFiles/*'])
     set('/debug_tests/debugger/cmd', ConfSettings.Null())
     set('/debug_tests/debugger/args', ConfSettings.Null())
+    set('/list_sources/include', ['*'])
+    set('/list_sources/exclude', [])
     set('/install_deps/script_filename', ConfSettings.Null() )
     set('/configure_build/script_filename', ConfSettings.Null() )
     set('/run_build/script_filename', ConfSettings.Null() )
