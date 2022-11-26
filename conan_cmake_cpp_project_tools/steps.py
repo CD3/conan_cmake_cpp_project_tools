@@ -7,6 +7,7 @@ import fnmatch
 import typer
 from os.path import relpath
 from .config import ConfSettings
+from rich import print
 
 def install_deps(config:ConfSettings,run=True):
 
@@ -133,7 +134,7 @@ def run_tests(config:ConfSettings,run=True):
     if not bdir.exists():
         raise RuntimeError(f"The build directory '{bdir}' has not been created yet.")
 
-    cmd_generator = CmdGenerator(config.get('/platform',None))
+    cmd_generator = CmdGenerator(config.get('/system',None))
     script = Script( system=config.get('/system',get_system()), shell=config.get('/shell', get_shell()) )
     script_filename = config.get('/run_build/script_filename','04-run_tests')
 
@@ -142,14 +143,32 @@ def run_tests(config:ConfSettings,run=True):
         script.cd(relpath(bdir,bdir.parent))
         script.activate_run_environment(bdir,bdir)
 
-        test_exes = find_unit_test_binaries(bdir,
-                filters=lambda p : p.is_file() and is_exe(p),
-                include_patterns=config.get('/run_tests/include',['*test*','*Test*']),
-                exclude_patterns=config.get('/run_tests/exclude',[])
-                )
+        include_patterns = config.get('/run_tests/include',ConfSettings(['*test*','*Test*']))
+        exclude_patterns = config.get('/run_tests/exclude',ConfSettings([]))
+        include_patterns_filter = filename_matches_pattern_filter(include_patterns.tree)
+        exclude_patterns_filter = filename_matches_pattern_filter(exclude_patterns.tree)
+
+        exes = list(bdir.glob("**/*") | pfilter(is_exe))
+        included_exes = list(exes | pfilter(include_patterns_filter))
+        excluded_exes = list(included_exes | pfilter(exclude_patterns_filter))
+        test_exes = list(included_exes | -pfilter(exclude_patterns_filter))
+
+        print("Found test executables:")
+        if len(test_exes) > 0:
+            for exe in test_exes:
+                print("  ",exe)
+        if len(exes) != len(included_exes):
+            print(f"These executables were found, but skipped because they did not match an include pattern ({include_patterns.tree}):")
+            for exe in exes:
+                if exe not in included_exes:
+                    print("  ",exe)
+        if len(excluded_exes) > 0:
+            print(f"These executables were found, but skipped because they matched an exclude pattern ({exclude_patterns.tree}):")
+            for exe in exes:
+                if exe in excluded_exes:
+                    print("  ",exe)
 
         for exe in test_exes:
-            print("Found test executable:",exe)
             args = []
             for pattern in config.get('/run_tests/args',ConfSettings([])).tree:
                 if fnmatch.fnmatch(exe,pattern):
@@ -182,7 +201,7 @@ def debug_tests(config:ConfSettings,run=True):
     if not bdir.exists():
         raise RuntimeError(f"The build directory '{bdir}' has not been created yet.")
 
-    cmd_generator = CmdGenerator(config.get('/platform',None))
+    cmd_generator = CmdGenerator(config.get('/system',None))
     script = Script( system=config.get('/system',get_system()), shell=config.get('/shell', get_shell()) )
     script_filename = config.get('/run_build/script_filename','05-debug_tests')
 
@@ -191,15 +210,35 @@ def debug_tests(config:ConfSettings,run=True):
         script.cd(relpath(bdir,bdir.parent))
         script.activate_run_environment(bdir,bdir)
 
-        test_exes = list(find_unit_test_binaries(bdir,
-                filters=lambda p : p.is_file() and is_debug_exe(p),
-                include_patterns=config.get('/run_tests/include',['*test*','*Test*']),
-                exclude_patterns=config.get('/run_tests/exclude',[])
-                ))
+        include_patterns = config.get('/debug_tests/include',ConfSettings(['*test*','*Test*']))
+        exclude_patterns = config.get('/debug_tests/exclude',ConfSettings([]))
+        include_patterns_filter = filename_matches_pattern_filter(include_patterns.tree)
+        exclude_patterns_filter = filename_matches_pattern_filter(exclude_patterns.tree)
+
+        exes = list(bdir.glob("**/*") | pfilter(is_debug_exe))
+        included_exes = list(exes | pfilter(include_patterns_filter))
+        excluded_exes = list(included_exes | pfilter(exclude_patterns_filter))
+        test_exes = list(included_exes | -pfilter(exclude_patterns_filter))
+
+        print("Found test executables:")
+        if len(test_exes) > 0:
+            for exe in test_exes:
+                print("  ",exe)
+        if len(exes) != len(included_exes):
+            print(f"These executables were found, but skipped because they did not match an include pattern ({include_patterns.tree}):")
+            for exe in exes:
+                if exe not in included_exes:
+                    print("  ",exe)
+        if len(excluded_exes) > 0:
+            print(f"These executables were found, but skipped because they matched an exclude pattern ({exclude_patterns.tree}):")
+            for exe in exes:
+                if exe in excluded_exes:
+                    print("  ",exe)
 
 
         if len(test_exes) < 1:
-            print("Did not find any test executables with debug symbols.")
+            print("[yellow]Did not find any test executables with debug symbols.[/yellow]")
+            return 0
 
         choice = 0
         if len(test_exes) > 1:
@@ -214,7 +253,6 @@ def debug_tests(config:ConfSettings,run=True):
         
         exe = test_exes[choice]
 
-        print("Found test executable:",exe)
         args = []
         for pattern in config.get('/debug_tests/args',ConfSettings([])).tree:
             if fnmatch.fnmatch(exe,pattern):

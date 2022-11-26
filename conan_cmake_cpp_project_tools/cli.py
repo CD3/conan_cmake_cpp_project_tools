@@ -56,7 +56,6 @@ def main(config_file:pathlib.Path=typer.Option(None,help='ccc project config fil
     if write_scripts:
         cfg['directories/scripts'] = cfg['directories/build']
 
-    print(cfg.get('/files/progress',None))
     if cfg.get('/files/progress',None) is None:
         cfg['/files/progress'] = cfg['directories/build'] / 'ccc-progress.yml'
 

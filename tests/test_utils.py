@@ -131,13 +131,16 @@ def test_list_source_files():
         files = list(utils.get_source_files(pathlib.Path(tmpdir), lambda p: p.name == 'file.bin'))
         assert len(files) == 2
 
-        files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.make_file_matches_pattern_filter('*.txt') ))
+        files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.filename_matches_pattern_filter('*.txt') ))
         assert len(files) == 5
 
-        files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.make_file_matches_pattern_filter('*.txt','*.bin') ))
+        files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.filename_matches_pattern_filter('*.txt','*.bin') ))
         assert len(files) == 7
 
-        files = list(utils.get_source_files(pathlib.Path(tmpdir), lambda p : utils.make_file_matches_pattern_filter('*.txt','*.bin')(p) and not utils.make_file_matches_pattern_filter('*.txt')(p) ))
+        files = list(utils.get_source_files(pathlib.Path(tmpdir), utils.filename_matches_pattern_filter(['*.txt','*.bin']) ))
+        assert len(files) == 7
+
+        files = list(utils.get_source_files(pathlib.Path(tmpdir), lambda p : utils.filename_matches_pattern_filter('*.txt','*.bin')(p) and not utils.filename_matches_pattern_filter('*.txt')(p) ))
         assert len(files) == 2
 
 
@@ -190,4 +193,92 @@ def test_find_test_binaries():
         tests_binaries = list(utils.find_unit_test_binaries(pathlib.Path(tmpdir), include_patterns='*build*', exclude_patterns=['*']))
         assert len(tests_binaries) == 0
 
+
+
+def test_pipes():
+    pfilter = utils.pfilter
+    ptransform = utils.ptransform
+
+    items = ["one","two","three"]
+
+    filtered_items = list( items | pfilter(lambda s: s == "one") )
+
+    assert len(filtered_items) == 1
+    assert filtered_items[0] == "one"
+
+    filtered_items = list( items | pfilter(lambda s: s.startswith("o"))
+                                 ^ pfilter(lambda s: s.endswith("e") ) )
+
+    assert len(filtered_items) == 2
+    assert filtered_items[0] == "one"
+    assert filtered_items[1] == "three"
+
+    filtered_items = list( items | pfilter(lambda s: s.startswith("o"))
+                                 ^ pfilter(lambda s: s.endswith("e"))
+                                 | pfilter(lambda s: s.startswith("t"))
+                                 )
+
+    assert len(filtered_items) == 1
+    assert filtered_items[0] == "three"
+
+
+    filtered_items = list( items | -pfilter(lambda s: s == "one") )
+
+    assert len(filtered_items) == 2
+    assert filtered_items[0] == "two"
+    assert filtered_items[1] == "three"
+
+    transformed_items = list( items | ptransform(lambda s: s[0]) )
+
+    assert len(transformed_items) == 3
+    assert transformed_items[0] == "o"
+    assert transformed_items[1] == "t"
+    assert transformed_items[2] == "t"
+
+    transformed_items = list( items | pfilter(lambda s : s == "one") | ptransform(lambda s: s[0]) )
+
+    assert len(transformed_items) == 1
+    assert transformed_items[0] == "o"
+
+    transformed_items = list( items | pfilter(lambda s : s == "one") ^ pfilter(lambda s : s == "three") | ptransform(lambda s: s[0]) )
+
+    assert len(transformed_items) == 2
+    assert transformed_items[0] == "o"
+    assert transformed_items[1] == "t"
+
+
+
+
+def test_sorting_paths():
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        (pathlib.Path(tmpdir) / "a/b/c/d/e").mkdir(parents=True)
+        (pathlib.Path(tmpdir) / "a/b/c/d/e/file.txt").write_text('')
+        (pathlib.Path(tmpdir) / "a/b/c/d/file.txt").write_text('')
+        (pathlib.Path(tmpdir) / "a/b/c/d/file.bin").write_text('')
+        (pathlib.Path(tmpdir) / "a/b/c/file.txt").write_text('')
+        (pathlib.Path(tmpdir) / "a/b/c/file.bin").write_text('')
+        (pathlib.Path(tmpdir) / "a/b/file.txt").write_text('')
+        (pathlib.Path(tmpdir) / "a/CMakeLists.txt").write_text('')
+        (pathlib.Path(tmpdir) / "a/conanfile.py").write_text('')
+
+        paths = list(utils.get_all_paths_below(pathlib.Path(tmpdir)))
+
+
+        assert len(paths) == 13
+
+        relative_paths = [ str(path.relative_to(pathlib.Path(tmpdir))) for path in paths ]
+
+        assert "a" in relative_paths
+        assert "a/b" in relative_paths
+        assert "a/b/c/d/e/file.txt" in relative_paths
+
+        files = list(utils.get_all_paths_below(pathlib.Path(tmpdir)) | utils.pfilter(lambda p: p.is_file()))
+
+        assert len(files) == 8
+
+
+
+
+        
 

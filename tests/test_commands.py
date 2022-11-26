@@ -61,6 +61,8 @@ int main(int argc, char* argv[])
         cfg["/system"] = "linux"
         cfg["/shell"] = "bash"
         cfg["/build_type"] = "Debug"
+        cfg["/run_tests/exclude"] = ["*/CMakeFiles/*"]
+        cfg["/debug_tests/exclude"] = ["*/CMakeFiles/*"]
 
 
         steps.install_deps(cfg,run=False)
@@ -183,6 +185,7 @@ echo "activating virtual environment"
 
         assert utils.is_exe( tmpdir/"Project1/build-test/main-tests")
         assert utils.is_debug_exe( tmpdir/"Project1/build-test/main-tests")
+
         files = list(utils.find_unit_test_binaries(tmpdir))
         assert len(files) == 1
         files[0].name == 'main-tests'
