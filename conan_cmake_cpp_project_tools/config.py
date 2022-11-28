@@ -59,12 +59,11 @@ class ConfSettings(fspathtree):
 
 def load_config_files( cfg: ConfSettings, root_dir:pathlib.Path, config_file_basename:str):
     # look for yaml files
-    data = {}
+    data = ConfSettings({})
     for file in sorted(list(find_file_at_or_above(root_dir,config_file_basename+".yml")),key=lambda p: len(p.parts)):
         with open(file) as f:
-            data.update(yaml.safe_load(f))
-
-    cfg.tree.update(data)
+            data.update(ConfSettings(yaml.safe_load(f)))
+    cfg.update(data)
 
 def set_defaults( cfg: ConfSettings, overwrite:bool = True):
 

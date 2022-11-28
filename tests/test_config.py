@@ -4,6 +4,31 @@ import tempfile
 import pathlib
 import pytest
 
+def test_config_setting_updates():
+
+    cfg = config.ConfSettings()
+    cfg['a/b/v1'] = 'one'
+    cfg['a/b/v2'] = ['two', 'three']
+
+    assert cfg.tree['a']['b']['v1'] == 'one'
+    assert cfg.tree['a']['b']['v2'][0] == 'two'
+    assert cfg.tree['a']['b']['v2'][1] == 'three'
+
+    keys = [ str(p) for p in cfg.get_all_leaf_node_paths() ]
+    assert '/a/b/v1' in keys
+    assert '/a/b/v2/0' in keys
+    assert '/a/b/v2/1' in keys
+
+    cfg2 = config.ConfSettings()
+    cfg2['/a/v1'] = 'four'
+
+    cfg.update(cfg2)
+
+    assert cfg['/a/v1'] == "four"
+    assert cfg['/a/b/v1'] == "one"
+    assert cfg['/a/b/v2/0'] == "two"
+    assert cfg['/a/b/v2/1'] == "three"
+
 def test_load_config_from_files():
     with tempfile.TemporaryDirectory() as tmpdir:
         (pathlib.Path(tmpdir) / "a/b/c/d/e").mkdir(parents=True)
@@ -11,6 +36,12 @@ def test_load_config_from_files():
 shell: bash
 cmake:
     cmd: /usr/bin/cmake
+    args:
+        - "-DCMAKE_BUILD_TYPE=Debug"
+        ''')
+        (pathlib.Path(tmpdir) / "a/b/c/d/e/ccc-user.yml").write_text('''
+cmake:
+    cmd: /usr/local/bin/cmake
         ''')
 
         (pathlib.Path(tmpdir) / "a/b/c/d/ccc.yml").write_text('''
@@ -24,15 +55,33 @@ shell: zsh
         cfg = config.ConfSettings()
         config.load_config_files(cfg,pathlib.Path(tmpdir)/'a/b/c/d/e', 'ccc')
 
-        assert cfg['system'] == "Linux"
-        assert cfg['shell'] == "bash"
-        assert cfg['cmake/cmd'] == "/usr/bin/cmake"
+        assert cfg['/system'] == "Linux"
+        assert cfg['/shell'] == "bash"
+        assert cfg['/cmake/cmd'] == "/usr/bin/cmake"
+        assert cfg['/cmake/args/0'] == "-DCMAKE_BUILD_TYPE=Debug"
 
         cfg = config.ConfSettings()
         config.load_config_files(cfg,pathlib.Path(tmpdir)/'a/b/c/d', 'ccc')
 
-        assert cfg['system'] == "Linux"
-        assert cfg['shell'] == "zsh"
+        assert cfg['/system'] == "Linux"
+        assert cfg['/shell'] == "zsh"
+
+
+        cfg = config.ConfSettings()
+        config.load_config_files(cfg,pathlib.Path(tmpdir)/'a/b/c/d/e', 'ccc')
+
+        assert cfg['/system'] == "Linux"
+        assert cfg['/shell'] == "bash"
+        assert cfg['/cmake/cmd'] == "/usr/bin/cmake"
+        assert cfg['/cmake/args/0'] == "-DCMAKE_BUILD_TYPE=Debug"
+
+        config.load_config_files(cfg,pathlib.Path(tmpdir)/'a/b/c/d/e', 'ccc-user')
+
+        assert cfg['/system'] == "Linux"
+        assert cfg['/shell'] == "bash"
+        assert cfg['/cmake/cmd'] == "/usr/local/bin/cmake"
+        assert cfg['/cmake/args/0'] == "-DCMAKE_BUILD_TYPE=Debug"
+
 
 def test_config_settings_class():
 

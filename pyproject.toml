@@ -9,7 +9,7 @@ packages = [{include = "conan_cmake_cpp_project_tools"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 typer = "^0.7.0"
-fspathtree = "^0.5"
+fspathtree = "^0.7"
 pyyaml = "^6.0"
 rich = "^12.6.0"
 
