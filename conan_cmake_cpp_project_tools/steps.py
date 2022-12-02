@@ -10,6 +10,9 @@ from .config import ConfSettings
 from rich import print
 
 def install_deps(config:ConfSettings,run=True):
+    if config.get('/files/conanfile',None) is None:
+        print("No conanfile found. Skipping install_deps step.")
+        return 0
 
     if config.get('/directories/build',None) is None:
         raise RuntimeError("No build directory given. Cannot run install_deps step.")
@@ -18,8 +21,8 @@ def install_deps(config:ConfSettings,run=True):
     
     
     with working_directory(config['directories/scripts']):
-        bdir = config['directories/build'].absolute()
-        cdir = config['files/conanfile'].absolute().parent
+        bdir = config['/directories/build'].absolute()
+        cdir = config['/files/conanfile'].absolute().parent
 
         script.cd(bdir.parent)
         script.mkdir(relpath(bdir,bdir.parent))

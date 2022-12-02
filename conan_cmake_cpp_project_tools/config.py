@@ -107,7 +107,7 @@ def set_defaults( cfg: ConfSettings, overwrite:bool = True):
 
 
 def set_default_build_dir(cfg:ConfSettings):
-    cfg['directories/build'] = cfg.get('directories/root',pathlib.Path())/make_build_dir_name(build_type=cfg.get('/build_type','unknown'),system=cfg.get('/system','unknown') )
+    cfg['directories/build'] = cfg.get('directories/root',pathlib.Path())/MAKE_BUild_dir_name(build_type=cfg.get('/build_type','unknown'),system=cfg.get('/system','unknown') )
 
 
 def set_default_conanfile(cfg:ConfSettings):
